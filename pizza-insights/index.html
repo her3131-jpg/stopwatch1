@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>피자 매장 시사점 3가지</title>
+  <meta name="description" content="피자 프랜차이즈 9개 매장 7년 실적에서 뽑은 시사점 3가지 — 30초 키네틱 타이포그래피 영상" />
+  <meta property="og:title" content="피자 매장 시사점 3가지" />
+  <meta property="og:image" content="poster.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root { --ground: #0b0814; --ink: #f2eef8; --dim: #8a82a0; --accent: #7823dc; --accent-hi: #b98cff; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: radial-gradient(120% 60% at 70% 100%, rgba(120,35,220,.18), transparent 60%), var(--ground);
+      color: var(--ink); font-family: "Noto Sans KR", system-ui, sans-serif; min-height: 100vh; }
+    main { max-width: 1120px; margin: 0 auto; padding: 56px 16px 72px; }
+    .tag { font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: .08em; color: var(--accent-hi); }
+    h1 { font-weight: 900; font-size: clamp(30px, 5vw, 52px); letter-spacing: -.03em; line-height: 1.2; margin: 10px 0 28px; }
+    h1 span { background: var(--accent); padding: 0 .18em; }
+    video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; border: 1px solid rgba(163,91,255,.35);
+      box-shadow: 0 0 60px rgba(120,35,220,.25); }
+    ol { list-style: none; margin-top: 36px; display: grid; gap: 18px; }
+    li { display: grid; grid-template-columns: 52px 1fr; gap: 14px; padding: 18px 0; border-top: 1px solid rgba(163,91,255,.2); }
+    li b.n { font-family: "JetBrains Mono", monospace; color: var(--accent-hi); font-size: 18px; padding-top: 3px; }
+    li h2 { font-size: clamp(18px, 2.4vw, 22px); font-weight: 700; line-height: 1.45; }
+    li p { color: var(--dim); font-size: 15px; margin-top: 6px; line-height: 1.6; }
+    .end { margin-top: 30px; font-size: clamp(18px, 2.4vw, 22px); font-weight: 700; }
+    .end span { color: var(--accent-hi); }
+    footer { margin-top: 48px; color: var(--dim); font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="tag">PIZZA FRANCHISE · 9 STORES · 2020.01—2026.08</div>
+    <h1>매장 실적에서 찾은 <span>세 가지 신호</span></h1>
+
+    <video controls playsinline preload="metadata" poster="poster.jpg">
+      <source src="insights-30s.mp4" type="video/mp4" />
+      브라우저가 동영상을 지원하지 않습니다. <a href="insights-30s.mp4">영상 파일 받기</a>
+    </video>
+
+    <ol>
+      <li><b class="n">01</b><div>
+        <h2>성장은 주문이 아닌 가격에서 나왔고, 그 몫은 인건비가 가져갔다</h2>
+        <p>월 주문 수는 2022년 이후 제자리, 객단가는 +18%. 같은 기간 인건비율은 24.5%(2020)에서 29.0%로 올라 이익률은 17% 안팎에 머물렀다.</p>
+      </div></li>
+      <li><b class="n">02</b><div>
+        <h2>자사앱은 커졌지만 배달앱 의존은 그대로, 쿠폰이 수수료보다 크다</h2>
+        <p>자사앱 주문 비중 5.6% → 31.4%, 외부 배달앱 비중은 43% 수준 유지. 매출 대비 쿠폰 할인 9.0% > 배달앱 수수료 7.0% (2026년 1–8월).</p>
+      </div></li>
+      <li><b class="n">03</b><div>
+        <h2>정규직이 빠진 매장부터 이익률이 무너지고 있다</h2>
+        <p>매장 간 이익률 격차 2.9%p(2025) → 7.8%p(2026). 점주 교체·정규직 이탈이 있었던 광주 충장로 13.2%, 제주 연동 14.2%.</p>
+      </div></li>
+    </ol>
+    <p class="end">다음 이익은 <span>생산성</span>에서 나온다.</p>
+
+    <footer>가상 데이터 기반 실습 분석 · 30초 키네틱 타이포그래피(HyperFrames 렌더) · 내레이션: 합성 음성</footer>
+  </main>
+</body>
+</html>
