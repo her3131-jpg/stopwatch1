@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스톱워치</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --text:#1c1e21; --muted:#7a8088; --accent:#2f6fed; --stop:#e5484d; --line:#e4e6ea; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161a; --card:#1e2127; --text:#f0f1f3; --muted:#8b919a; --line:#2c3038; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif; padding:16px; }
+  .card { background:var(--card); border-radius:20px; padding:32px 28px; width:100%; max-width:420px;
+          box-shadow:0 8px 30px rgba(0,0,0,.08); }
+  .scene { width:100%; aspect-ratio:1/1; border-radius:14px; margin-bottom:12px; overflow:hidden;
+           background:#cfe8ff; }
+  .scene svg { width:100%; height:100%; display:block; }
+  .time { font-size:clamp(44px,14vw,64px); font-weight:600; text-align:center; font-variant-numeric:tabular-nums; letter-spacing:1px; }
+  .time small { font-size:.55em; color:var(--muted); }
+  .btns { display:flex; gap:12px; margin-top:24px; }
+  button { flex:1; padding:14px; font-size:17px; font-weight:600; border:0; border-radius:12px; cursor:pointer;
+           background:var(--line); color:var(--text); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--accent); color:#fff; }
+  button.primary.running { background:var(--stop); }
+  ul { list-style:none; margin:20px 0 0; padding:0; max-height:240px; overflow:auto; }
+  li { display:flex; justify-content:space-between; padding:10px 4px; border-top:1px solid var(--line);
+       font-variant-numeric:tabular-nums; }
+  li span:first-child { color:var(--muted); }
+  .hint { text-align:center; color:var(--muted); font-size:12px; margin-top:16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="scene"><svg id="tree" viewBox="0 0 300 300"></svg></div>
+  <div class="time" id="display">00:00<small>.00</small></div>
+  <div class="btns">
+    <button id="lap" disabled>랩</button>
+    <button id="start" class="primary">시작</button>
+    <button id="reset" disabled>초기화</button>
+  </div>
+  <ul id="laps"></ul>
+  <div class="hint">단축키: 스페이스 시작/정지 · L 랩 · R 초기화</div>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+
+  /* ---- 나무 성장 ---- */
+  const GROW_SECONDS = 90;           // 이 시간이 지나면 완전히 자란 나무
+  const MAX_DEPTH = 5;
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const branches = [];
+  (function init() {
+    seed = 11; branches.length = 0;
+    (function build(parent, depth, angle, len) {
+      const b = { parent, depth, angle, len, width: Math.max(1.3, 9 - depth * 1.8),
+                  start: parent ? parent.start + parent.dur * 0.7 : 0.0, dur: 0.24 - depth * 0.02, leaves: [] };
+      // 활엽수 잎: 가지를 따라 양옆으로 달림
+      const nLeaf = depth === 0 ? 4 : (depth < MAX_DEPTH ? 4 : 6);
+      for (let i = 0; i < nLeaf; i++) {
+        const t = depth === 0 ? 0.5 + 0.5 * (i + 1) / nLeaf : (i + 1) / nLeaf;
+        b.leaves.push({ t, side: i % 2 ? 1 : -1, size: 0.8 + rnd() * 0.5, tilt: 25 + rnd() * 35,
+                        shade: Math.floor(rnd() * 4) });
+      }
+      branches.push(b);
+      if (depth < MAX_DEPTH) {
+        const n = depth === 0 ? 1 : 2;
+        for (let i = 0; i < n; i++) {
+          const a = depth === 0 ? (rnd() - .5) * 4 : angle + (i ? 1 : -1) * (24 + rnd() * 16) + (rnd() - .5) * 8;
+          build(b, depth + 1, a, len * (depth === 0 ? 0.95 : 0.8 + rnd() * 0.06));
+        }
+      }
+    })(null, 0, 0, 42);
+  })();
+
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  const LEAF_COLORS = ['#3f9a3a', '#55ad45', '#6cc050', '#4a9f3e'];
+  const CLOUDS = [ { x: 40, y: 78, s: 1.0, need: 45, v: 6 }, { x: 210, y: 52, s: 1.3, need: 80, v: 4 },
+                   { x: 120, y: 28, s: 0.8, need: 105, v: 8 }, { x: 250, y: 100, s: 0.9, need: 130, v: 5 } ];
+
+  // ---- 낮/밤 주기 ----
+  const DAY_SECONDS = 60;            // 낮→밤→낮 한 바퀴 시간
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => { const A = hex(a), B = hex(b);
+    return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')'; };
+  const STARS = Array.from({ length: 30 }, (_, i) => ({ x: (i * 97 + 31) % 300, y: (i * 53 + 11) % 150, r: 0.6 + (i % 3) * 0.4 }));
+
+  function cloud(c, ms, vis, fill) {
+    const x = ((c.x + ms / 1000 * c.v + 60) % 420) - 60;
+    return `<g transform="translate(${x.toFixed(1)} ${c.y}) scale(${c.s})" opacity="${(vis * 0.95).toFixed(2)}" fill="${fill}">
+      <ellipse cx="0" cy="0" rx="24" ry="9"/><circle cx="-8" cy="-7" r="9"/><circle cx="6" cy="-10" r="12"/><circle cx="17" cy="-4" r="8"/></g>`;
+  }
+
+  const rgbHex = c => '#' + c.match(/\d+/g).map(n => (+n).toString(16).padStart(2, '0')).join('');
+
+  function drawTree(ms) {
+    const p = clamp01(ms / 1000 / GROW_SECONDS);
+    const GX = 150, GY = 250;
+    const ends = new Map(); let wood = '', leaves = '', top = GY;
+    for (const b of branches) {
+      const g = ease(clamp01((p - b.start) / b.dur));
+      if (g <= 0) continue;
+      const base = b.parent ? ends.get(b.parent) : { x: GX, y: GY };
+      const a = (b.angle * Math.PI) / 180;
+      const L = b.len * g;
+      const dx = Math.sin(a), dy = -Math.cos(a);
+      const x2 = base.x + dx * L, y2 = base.y + dy * L;
+      ends.set(b, { x: x2, y: y2 });
+      if (y2 < top) top = y2;
+      const w = b.width * (b.depth === 0 ? 0.4 + 0.6 * clamp01(p * 2.5) : 1);
+      const col = b.depth < 2 ? '#6b4a2f' : (b.depth < 4 ? '#7c5a38' : '#8a6a44');
+      wood += `<line x1="${base.x.toFixed(1)}" y1="${base.y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="${w.toFixed(1)}" stroke-linecap="round"/>`;
+      // 줄기 아랫부분 잎은 나무가 자라면 떨어져 맨 줄기가 됨
+      const trunkFade = b.depth === 0 ? 1 - clamp01((p - 0.2) / 0.2) : 1;
+      if (trunkFade <= 0) continue;
+      const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;   // 가지 방향(위쪽 0°)
+      for (const lf of b.leaves) {
+        const k = ease(clamp01((g - lf.t) / 0.25)) * trunkFade;
+        if (g < lf.t || k <= 0.01) continue;
+        const px = base.x + dx * b.len * lf.t, py = base.y + dy * b.len * lf.t;
+        const s = lf.size * k * (0.7 + 0.3 * p);
+        const rot = deg + lf.side * lf.tilt;
+        leaves += `<use href="#leaf" transform="translate(${px.toFixed(1)} ${py.toFixed(1)}) rotate(${rot.toFixed(0)}) scale(${s.toFixed(2)})" fill="${LEAF_COLORS[lf.shade]}"/>`;
+      }
+    }
+    const height = GY - top;
+    // 하늘 색: 해 높이(sin)에 따라 밤↔낮, 해 뜨고 질 때 노을색
+    const f = (ms / 1000 / DAY_SECONDS + 0.2) % 1, ang = f * Math.PI * 2, sn = Math.sin(ang);
+    const day = clamp01((sn + 0.2) / 0.5);
+    const dusk = Math.max(0, 1 - Math.abs(sn + 0.05) / 0.3);
+    let skyTop = mix('#0b1230', '#6fb6f2', day), skyBot = mix('#1d2a4d', '#d6efff', day);
+    skyBot = mix(skyBot.startsWith('rgb') ? rgbHex(skyBot) : skyBot, '#ff9a5c', dusk * 0.75);
+    skyTop = mix(rgbHex(skyTop), '#6a5a9c', dusk * 0.4);
+    let out = `<defs><path id="leaf" d="M0 0 C 5 -4, 6 -12, 0 -20 C -6 -12, -5 -4, 0 0Z"/>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${skyTop}"/><stop offset="1" stop-color="${skyBot}"/></linearGradient></defs>`;
+    out += `<rect width="300" height="300" fill="url(#sky)"/>`;
+    for (const st of STARS) out += `<circle cx="${st.x}" cy="${st.y}" r="${st.r}" fill="#fff" opacity="${(clamp01(1 - day * 1.6) * (0.5 + 0.5 * Math.sin(ms / 400 + st.x))).toFixed(2)}"/>`;
+    const sunX = 150 - Math.cos(ang) * 135, sunY = 235 - sn * 200;
+    const moonX = 150 + Math.cos(ang) * 135, moonY = 235 + sn * 200;
+    out += `<circle cx="${sunX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="30" fill="#ffd54a" opacity="${(0.18 * clamp01(sn + 0.3)).toFixed(2)}"/>
+            <circle cx="${sunX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="14" fill="${mix('#ffd54a', '#ff7a3c', dusk)}"/>`;
+    out += `<g transform="translate(${moonX.toFixed(1)} ${moonY.toFixed(1)})"><circle r="11" fill="#f4f1de"/><circle cx="-4" cy="-3" r="2" fill="#d9d5bd"/><circle cx="4" cy="4" r="2.5" fill="#d9d5bd"/></g>`;
+    const cloudFill = mix('#4a5576', '#ffffff', day);
+    for (const c of CLOUDS) {
+      const vis = clamp01((height - c.need) / 25);
+      if (vis > 0) out += cloud(c, ms, vis, cloudFill);
+    }
+    out += `<ellipse cx="${GX}" cy="${GY + 2}" rx="${20 + p * 70}" ry="4" fill="#00000018"/>`;
+    out += `<rect x="0" y="${GY}" width="300" height="50" fill="#6b4a2f"/>`;
+    out += `<path d="M0 ${GY} Q75 ${GY - 8} 150 ${GY - 2} T300 ${GY} V${GY + 8} H0Z" fill="#5fae4e"/>`;
+    out += wood + leaves;
+    out += `<rect width="300" height="300" fill="#0a1030" opacity="${((1 - day) * 0.38).toFixed(2)}"/>`;
+    $('tree').innerHTML = out;
+  }
+
+  let elapsed = 0, startAt = 0, timer = null, laps = [], lastLap = 0;
+
+  function fmt(ms) {
+    const cs = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60, m = Math.floor(ms / 60000);
+    const p = n => String(n).padStart(2, '0');
+    return { main: `${p(m)}:${p(s)}`, cs: p(cs) };
+  }
+  const text = ms => { const f = fmt(ms); return `${f.main}.${f.cs}`; };
+
+  function render() {
+    const now = timer ? elapsed + performance.now() - startAt : elapsed;
+    const f = fmt(now);
+    $('display').innerHTML = `${f.main}<small>.${f.cs}</small>`;
+    drawTree(now);
+  }
+  function tick() { render(); timer = requestAnimationFrame(tick); }
+
+  function toggle() {
+    if (timer) {
+      elapsed += performance.now() - startAt;
+      cancelAnimationFrame(timer); timer = null; render();
+      $('start').textContent = '계속'; $('start').classList.remove('running');
+      $('lap').disabled = true;
+    } else {
+      startAt = performance.now(); timer = requestAnimationFrame(tick);
+      $('start').textContent = '정지'; $('start').classList.add('running');
+      $('lap').disabled = false; $('reset').disabled = false;
+    }
+  }
+  function lap() {
+    if (!timer) return;
+    const total = elapsed + performance.now() - startAt;
+    laps.unshift({ n: laps.length + 1, split: total - lastLap, total });
+    lastLap = total;
+    $('laps').innerHTML = laps.map(l =>
+      `<li><span>랩 ${l.n}</span><span>${text(l.split)}</span><span>${text(l.total)}</span></li>`).join('');
+  }
+  function reset() {
+    if (timer) cancelAnimationFrame(timer);
+    timer = null; elapsed = 0; laps = []; lastLap = 0;
+    $('laps').innerHTML = ''; render();
+    $('start').textContent = '시작'; $('start').classList.remove('running');
+    $('lap').disabled = true; $('reset').disabled = true;
+  }
+
+  render();
+  $('start').onclick = toggle; $('lap').onclick = lap; $('reset').onclick = reset;
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.key.toLowerCase() === 'l') lap();
+    else if (e.key.toLowerCase() === 'r') reset();
+  });
+</script>
+</body>
+</html>
